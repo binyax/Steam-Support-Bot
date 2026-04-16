@@ -18,12 +18,14 @@ Para aislar las dependencias del proyecto y evitar conflictos de sistema, creamo
 
 * python -m venv .venv
 
+* (Linux) python3 -m venv .venv
 ---
 
 3. Activar el entorno
 Activa el entorno de trabajo segun tu terminal (en este proyecto usamos Git Bash):
 
 * source .venv/Scripts/activate
+* (Linux) source .venv/bin/activate
 
 Sabrás que está activo porque aparecerá (.venv) al inicio de tu línea de comandos.
 
@@ -33,6 +35,21 @@ Sabrás que está activo porque aparecerá (.venv) al inicio de tu línea de com
 Instala todas las librerias necesarias utilizando el archivo llamado requirements.txt:
 
 pip install -r requirements.txt
+
+
+4.1  Instalacion de dependencias (Linux)
+
+Actualizar pip (Opcional)
+
+* pip install --upgrade pip
+
+Instalacion de dependencias
+
+* pip install -r requirements.txt
+
+(Si este da errores con langsmith se puede probar limpiando la cache del pip)
+
+* pip install --no-cache-dir -r requirements.txt
 
 ---
 
