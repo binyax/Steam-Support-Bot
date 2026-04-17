@@ -1,66 +1,32 @@
-# Steam-Support-Bot
+# Riot Games Support Bot <img width="250" height="100" alt="image" src="https://github.com/user-attachments/assets/16415399-531d-4f7c-b019-e33e536603bc" />
 
-🛠️ Guia de configuracion inicial
-Se deben seguir estos pasos para replicar el entorno de desarrollo y ejecutar el Steam Support Bot en local
+## Descripción
+Este repositorio contiene la implementación de un ChatBot de soporte técnico automatizado para **Riot Games**. El proyecto se centra en demostrar la capacidad de **Prompt Engineering** para adaptar el comportamiento de un modelo de lenguaje (LLM) según el contexto del usuario.
 
----
+El bot es capaz de distinguir entre un problema técnico legítimo y una queja por baneo de comportamiento, respondiendo con una personalidad administrativa o con una actitud **antisonante y hostil** si el usuario fue sancionado por toxicidad.
 
-1. Clonar el repositorio
-Primero se debe obtener una copia local del proyecto, copiando el link del repo. En la bash se debera pegar lo siguiente:
+## Objetivo de Aprendizaje
+> "Formula prompts para modelos de lenguaje, ajustando su estructura y contenido según las características del requerimiento informacional del caso."
 
-git clone https://github.com/binyax/Steam-Support-Bot.git
-cd Steam-Support-Bot
+## Lógica de Prompting
+Para cumplir con el requerimiento, el sistema utiliza una estructura de **Prompt por Capas**:
 
----
-
-2. Crear el entorno virtual
-Para aislar las dependencias del proyecto y evitar conflictos de sistema, creamos un entorno virtual. En la bash se debera pegar lo siguiente:
-
-* python -m venv .venv
-
-* (Linux) python3 -m venv .venv
----
-
-3. Activar el entorno
-Activa el entorno de trabajo segun tu terminal (en este proyecto usamos Git Bash):
-
-* source .venv/Scripts/activate
-* (Linux) source .venv/bin/activate
-
-Sabrás que está activo porque aparecerá (.venv) al inicio de tu línea de comandos.
+1.  **Capa de Clasificación:** El modelo analiza si el usuario reporta un error técnico o una apelación de sanción.
+2.  **Capa de Estructura:** * **Contexto:** Soporte oficial de Riot Games.
+    * **Tarea:** Resolver dudas o denegar apelaciones.
+    * **Restricciones:** No ser amable con jugadores tóxicos.
+3.  **Capa de Tono (Contenido):**
+    * **Caso A (Técnico):** Tono corporativo, empático y estructurado.
+    * **Caso B (Tóxico):** Tono Agresivo, sarcástico, antisonante y tajante.
 
 ---
 
-4. Instalacion de dependencias
-Instala todas las librerias necesarias utilizando el archivo llamado requirements.txt:
+## Ejemplos de Prompting Aplicado
 
-pip install -r requirements.txt
-
-
-4.1  Instalacion de dependencias (Linux)
-
-Actualizar pip (Opcional)
-
-* pip install --upgrade pip
-
-Instalacion de dependencias
-
-* pip install -r requirements.txt
-
-(Si este da errores con langsmith se puede probar limpiando la cache del pip)
-
-* pip install --no-cache-dir -r requirements.txt
-
----
-
-5. Configuración de Variables de Entorno (.env)
-El sistema requiere llaves de acceso para funcionar, las cuales se gestionan de forma segura localmente:
-
-Crea un archivo llamado .env en la carpeta raiz.
-
-Copia el contenido del archivo .env.example y pegalo en tu nuevo archivo .env
-
-Remplaza los valores de ejemplo por tus credenciales reales (GITHUB_TOKEN y LANGSMITH_API_KEY).
-
-
-Nota de Seguridad: El archivo .env está incluido en el .gitignore, por lo que las credenciales nunca se subiran al repositorio publico.
+### Estructura del System Prompt
+```text
+"Actúa como un moderador de Riot Games harto de la comunidad. 
+Si detectas que el usuario fue baneado por insultar o arruinar partidas:
+- No uses lenguaje diplomático.
+- Sé agresivo y directo: usa frases como 'El juego es mejor sin ti' o 'Deja de llorar'.
+- Deja claro que su comportamiento es patético y el baneo es permanente."
