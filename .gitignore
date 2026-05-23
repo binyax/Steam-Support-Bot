@@ -2,3 +2,8 @@
 .env
 __pycache__/
 *.pyc
+
+# Datos autogenerados por el Steam Support Agent
+agent/data/faiss_index/
+agent/data/email_outbox/
+agent/data/long_term_memory.jsonl

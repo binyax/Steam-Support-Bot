@@ -1,0 +1,17 @@
+# Dependencias específicas del Steam Support Agent (módulo agent/)
+# Se instalan ADEMÁS de las del requirements.txt raíz del proyecto.
+#
+#   pip install -r agent/requirements-agent.txt
+
+# Framework de agentes (orquestación, roles, tools, planificación)
+crewai>=0.80.0
+
+# Vector Store local para la memoria semántica a largo plazo (IE4)
+faiss-cpu>=1.8.0
+
+# Cadenas/loaders/embeddings de LangChain reutilizados por la memoria
+langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
+
+# Ya presentes en requirements.txt raíz pero necesarias aquí:
+#   langchain-openai, python-dotenv

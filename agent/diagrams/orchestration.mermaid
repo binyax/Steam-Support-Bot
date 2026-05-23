@@ -1,0 +1,59 @@
+%% Diagrama de Orquestacion de Componentes -- Steam Support Agent (IE8)
+%% Render: VS Code (extension Mermaid), GitHub, o https://mermaid.live
+flowchart TD
+    U([Usuario de Steam]) -->|mensaje + email| ENTRY[resolver_caso_soporte<br/>agent/crew.py]
+
+    subgraph CONFIG[Configuracion · config.py]
+        LLM[LLM CrewAI<br/>GPT-4o via GitHub Models]
+        EMB[Embeddings<br/>text-embedding-3-small]
+    end
+
+    subgraph MEM[Memoria · memory.py]
+        STM[Corto plazo<br/>Buffer + estado del caso]
+        LTM[(Largo plazo<br/>FAISS + log JSONL)]
+        KB[[Base de conocimiento<br/>steam_support_kb.md]]
+        KB --> LTM
+    end
+
+    ENTRY -->|inyecta contexto| MEM
+    ENTRY --> CREW
+
+    subgraph CREW[Crew · proceso secuencial · crew.py]
+        direction TB
+        A1[Analista de Soporte]
+        A2[Especialista en Comunicaciones]
+
+        T1[1· Validar usuario] --> T2[2· Buscar en KB]
+        T2 --> T3[3· Redactar correo]
+        T3 --> T4[4· Enviar correo]
+    end
+
+    A1 -. ejecuta .-> T1
+    A1 -. ejecuta .-> T2
+    A2 -. ejecuta .-> T3
+    A2 -. ejecuta .-> T4
+
+    subgraph TOOLS[Tools autonomas · agent/tools]
+        TV[validar_usuario]
+        TK[buscar_en_base_conocimiento]
+        TE[enviar_correo_soporte]
+    end
+
+    T1 --> TV
+    T2 --> TK
+    T4 --> TE
+
+    TK --> LTM
+    EMB --> LTM
+    LLM --> A1
+    LLM --> A2
+
+    TE -->|SMTP STARTTLS| SMTP[(Servidor SMTP)]
+    TE -.->|sin credenciales / fallo| SIM[Outbox simulado<br/>.eml]
+
+    T4 -->|status: sent / simulated| OK([Caso cerrado<br/>+ correo enviado])
+    T4 -->|status: failed tras reintento| ESC([Escalamiento a humano])
+
+    OK --> SAVE[remember_case<br/>persiste a memoria largo plazo]
+    ESC --> SAVE
+    SAVE --> LTM

@@ -1,0 +1,17 @@
+REGLAS Y POLITICAS DE SOPORTE DE STEAM (Base de conocimiento para RAG)
+
+1. RECUPERACION DE CUENTA: El proceso inicia en help.steampowered.com -> "No puedo iniciar sesion". Se verifica identidad con correo, telefono o metodo de pago historico (ultimos 4 digitos / ID de transaccion). Tiempo estandar: 24-72 horas habiles. Nunca se solicita la contrasena completa por correo.
+
+2. SEGURIDAD / CUENTA COMPROMETIDA: Señales de robo: inicios de sesion de regiones desconocidas, cambios de correo no autorizados, trades no reconocidos. Accion: activar Steam Guard, forzar cambio de contrasena, revocar sesiones. Prioridad ALTA. Los articulos intercambiados de forma fraudulenta pueden restaurarse dentro de 30 dias.
+
+3. TICKETS: Identificador con formato STM-XXXXXX. Prioridades: BAJA (consultas, 72h), MEDIA (compra/instalacion, 48h), ALTA (seguridad/acceso, 24h).
+
+4. REEMBOLSOS: Validos dentro de 14 dias de la compra y con menos de 2 horas jugadas. DLC, contenido in-game y Steam Wallet tienen reglas particulares.
+
+5. STEAM GUARD / 2FA: Codigo por correo o app movil. Operaciones sensibles requieren el autenticador movil activo al menos 7 dias. Recuperar el autenticador desactiva el Market por 15 dias.
+
+6. FACTURACION: Errores comunes: pago rechazado, cargo duplicado, compra no acreditada. Cargos duplicados se reembolsan en 5-7 dias habiles. Un chargeback bloquea la cuenta y requiere escalamiento manual.
+
+7. ESCALAMIENTO MANUAL: Escalar a humano si hay fraude/chargeback, identidad no verificable, posible violacion de Terminos de Servicio (VAC, abuso), o si el envio de correo falla tras reintentos.
+
+8. COMUNICACION POR CORREO: Identificarse como "Soporte de Steam (asistente automatizado)", incluir el numero de ticket, no pedir contrasenas ni codigos 2FA completos, y dirigir solo a dominios oficiales (steampowered.com / steamcommunity.com).
