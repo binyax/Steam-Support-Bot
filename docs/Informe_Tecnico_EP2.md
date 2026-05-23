@@ -1,11 +1,6 @@
 # Informe Técnico — Agente Autónomo de Soporte para Steam
 ### Evaluación Parcial 2 · Proyecto *Steam-Support-Bot*
 
-> Borrador estructurado (extensión objetivo: ≤ 5 páginas). El lenguaje es técnico
-> y formal; cada sección puede comprimirse o expandirse según el formato final.
-
----
-
 ## 1. Resumen ejecutivo
 
 Se implementó un **agente autónomo de soporte** capaz de analizar la solicitud de
