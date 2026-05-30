@@ -32,9 +32,11 @@ Sabrás que está activo porque aparecerá (.venv) al inicio de tu línea de com
 ---
 
 4. Instalacion de dependencias
-Instala todas las librerias necesarias utilizando el archivo llamado requirements.txt:
+Instala todas las librerias necesarias utilizando los tres archivos de requirements (nucleo + agente + interfaz web):
 
 pip install -r requirements.txt
+pip install -r agent/requirements-agent.txt
+pip install -r webapp/requirements-web.txt
 
 
 4.1  Instalacion de dependencias (Linux)
@@ -46,6 +48,8 @@ Actualizar pip (Opcional)
 Instalacion de dependencias
 
 * pip install -r requirements.txt
+* pip install -r agent/requirements-agent.txt
+* pip install -r webapp/requirements-web.txt
 
 (Si este da errores con langsmith se puede probar limpiando la cache del pip)
 
@@ -71,7 +75,9 @@ Nota de Seguridad: El archivo .env está incluido en el .gitignore, por lo que l
 ```
 Steam-Support-Bot/
 ├── README.md                 # Esta guía
-├── requirements.txt          # Dependencias de los notebooks
+├── AWS_README.md             # Guía paso a paso para desplegar en EC2 Ubuntu
+├── deploy.sh                 # Script de despliegue/actualización idempotente para EC2
+├── requirements.txt          # Dependencias de los notebooks y del núcleo
 ├── .env.example              # Plantilla de variables de entorno
 │
 ├── notebooks/                # Notebooks didácticos (paso a paso) + bot integrado
@@ -88,6 +94,19 @@ Steam-Support-Bot/
 │   └── reglas_steam.txt         # Base de conocimiento para el RAG (notebook 06)
 │
 ├── agent/                    # Agente autónomo de soporte (CrewAI) — ver sección siguiente
+│
+├── webapp/                   # Interfaz web (FastAPI + SSE) — ver sección 13
+│   ├── server.py             #   FastAPI: /api/health, /api/support, /api/support/stream
+│   ├── requirements-web.txt  #   Dependencias específicas (fastapi, uvicorn, pydantic)
+│   └── static/               #   Frontend (HTML/CSS/JS sin build step)
+│       ├── index.html        #     UI estilo Steam Big Picture (topbar + sidebar + chat)
+│       ├── styles.css        #     Tema oscuro con acento cyan + responsive
+│       └── app.js            #     Chat conversacional + EventSource (SSE)
+│
+├── deploy/                   # Configuración para despliegue en EC2 Ubuntu
+│   ├── nginx.conf            #   Reverse proxy con headers SSE-friendly
+│   └── steam-bot.service     #   Unit systemd para uvicorn
+│
 ├── tests/                    # Pruebas de decisión adaptativa del agente
 └── docs/                     # Informe técnico
 ```
@@ -255,3 +274,53 @@ pytest tests/test_agent_flows.py -v
 
 > La documentación ampliada del agente está en `agent/README.md` y el informe
 > técnico completo en `docs/Informe_Tecnico_EP2.md`.
+
+---
+
+# 🌐 Interfaz web (módulo `webapp/`)
+
+Además de la CLI, el proyecto incluye una **interfaz web** que envuelve
+`resolver_caso_soporte` con FastAPI y un frontend conversacional (estilo Steam
+Big Picture: topbar + sidebar de categorías + chat con burbujas). El backend
+expone tres endpoints:
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET`  | `/api/health` | Healthcheck para Nginx/monitoreo |
+| `POST` | `/api/support` | Ejecuta el crew y devuelve el resultado en JSON |
+| `GET`  | `/api/support/stream` | Server-Sent Events con el progreso en vivo |
+
+## 13. Levantar la web en local
+
+Con el entorno virtual activado y las dependencias instaladas (incluidas las
+de `webapp/requirements-web.txt`):
+
+```bash
+# desde la raíz del proyecto
+uvicorn webapp.server:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Abre **http://127.0.0.1:8000/** en el navegador.
+
+> ⚠️ No abras `webapp/static/index.html` con doble clic: las rutas a
+> `/static/styles.css` y `/api/*` no resuelven con `file://`. Siempre accede
+> por el servidor uvicorn.
+
+El frontend usa **rutas relativas** (`/api/...`), por lo que el mismo bundle
+funciona en localhost y en la IP pública de EC2 sin cambios.
+
+---
+
+# ☁️ Despliegue en AWS EC2
+
+Para servir la interfaz y el agente en una instancia EC2 Ubuntu 22.04 con
+Nginx + systemd, la guía paso a paso está en **[`AWS_README.md`](./AWS_README.md)**.
+Incluye:
+
+- Configuración del Security Group (puerto 80).
+- Clonado del repo en `/opt/steam-support-bot` y creación del `.env`.
+- Despliegue automático con `sudo ./deploy.sh` (venv + dependencias + Nginx +
+  systemd + healthcheck).
+- Comandos manuales equivalentes (por si prefieres no usar el script).
+- HTTPS opcional con Certbot.
+- Troubleshooting habitual (502, SSE cortado, etc.).
