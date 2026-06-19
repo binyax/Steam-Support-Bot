@@ -50,6 +50,19 @@ class Settings:
     embedding_model: str = "text-embedding-3-small"
     temperature: float = 0.2  # bajo a proposito: en soporte queremos respuestas parejas
 
+    # --- Limites defensivos contra token-drain / DoS (ver webapp/security.py) ---
+    # Tope duro de tokens generados por llamada al LLM.
+    llm_max_tokens: int = 1024
+    # Maximas requests por minuto al endpoint del LLM.
+    llm_max_rpm: int = 20
+    # Iteraciones maximas por agente CrewAI (evita bucles de razonamiento).
+    agent_max_iter: int = 8
+    # Reintentos del cliente HTTP ante 429/5xx. Bajo a proposito: cuando GitHub
+    # Models devuelve 429 (cuota diaria), reintentar solo desperdicia mas cuota.
+    llm_max_retries: int = 1
+    # Reintentos a nivel de tarea (CrewAI). Bajo por la misma razon.
+    agent_max_retry_limit: int = 1
+
     # Datos del SMTP para mandar correos de verdad
     smtp_host: str = field(default_factory=lambda: os.getenv("SMTP_HOST", "smtp.gmail.com"))
     smtp_port: int = field(default_factory=lambda: int(os.getenv("SMTP_PORT", "587")))
@@ -97,6 +110,10 @@ def get_llm():
         base_url=settings.github_base_url,
         api_key=settings.github_token,
         temperature=settings.temperature,
+        # Limites defensivos: previenen token-drain y respuestas infladas
+        max_tokens=settings.llm_max_tokens,
+        # Frente a 429 reintentar solo gasta mas cuota: cortamos en 1 intento
+        max_retries=settings.llm_max_retries,
     )
 
 

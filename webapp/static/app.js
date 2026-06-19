@@ -267,12 +267,30 @@ function sendCase({ mensaje, email, steam_id }) {
   });
 
   src.addEventListener("error", (ev) => {
+    // Dos casos:
+    // (a) El backend emitio "error" con {detail}: rechazo intencional (seguridad,
+    //     off-policy, rate limit). Mostramos el detalle como respuesta del bot.
+    // (b) EventSource disparo su error nativo (conexion cortada): sin detalle,
+    //     fallback generico.
     const d = safeParse(ev.data);
-    const msg = (d && d.detail) ? d.detail : "Se interrumpió la conexión con el agente.";
-    addStep(stepsCard, { title: "Error", body: msg, klass: "error" });
-    thinking.querySelector(".bubble-body").textContent =
-      "No pude completar el caso. Revisa los detalles del proceso o vuelve a intentarlo.";
-    setStepsTitle(stepsCard, "Falló el proceso");
+    const hasDetail = d && d.detail;
+
+    if (hasDetail) {
+      thinking.classList.remove("thinking");
+      thinking.querySelector(".bubble-body").textContent = d.detail;
+      // Quita el panel de pasos vacio para mantener la conversacion limpia
+      if (stepsCard && stepsCard.parentNode) stepsCard.remove();
+    } else {
+      addStep(stepsCard, {
+        title: "Error",
+        body: "Se interrumpio la conexion con el agente.",
+        klass: "error",
+      });
+      thinking.querySelector(".bubble-body").textContent =
+        "No pude completar el caso. Vuelve a intentarlo en unos segundos.";
+      setStepsTitle(stepsCard, "Falló el proceso");
+    }
+
     sendBtn.disabled = false;
     src.close();
     currentSource = null;

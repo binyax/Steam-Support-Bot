@@ -1,118 +1,87 @@
 #!/usr/bin/env bash
 # ----------------------------------------------------------------------
-# deploy.sh - Despliegue/actualizacion idempotente para EC2 Ubuntu.
+# deploy.sh - Despliegue/actualizacion con Docker Compose en EC2.
 #
 # Que hace:
 #   1) Sincroniza el codigo (git pull si es un repo).
-#   2) Crea/actualiza el venv en .venv y reinstala dependencias.
-#   3) Copia (o enlaza) la config de Nginx y la unit de systemd.
-#   4) Recarga Nginx y reinicia el servicio steam-bot.
+#   2) Verifica que existe .env y docker/compose disponibles.
+#   3) Construye la imagen y levanta los servicios (app + nginx).
+#   4) Espera healthcheck y muestra estado.
 #
 # Uso:
 #   chmod +x deploy.sh
-#   sudo ./deploy.sh                  # primera vez, requiere root para nginx/systemd
-#   ./deploy.sh --skip-system         # solo actualiza venv + reinicia el servicio
+#   ./deploy.sh              # build + up
+#   ./deploy.sh --no-build   # solo recrear contenedores
+#   ./deploy.sh --logs       # muestra logs en vivo tras levantar
 # ----------------------------------------------------------------------
 set -euo pipefail
 
-# ---- Config ----
-APP_DIR="${APP_DIR:-/opt/steam-support-bot}"
-APP_USER="${APP_USER:-ubuntu}"
-VENV_DIR="${APP_DIR}/.venv"
-PY_BIN="${PY_BIN:-python3}"
-NGINX_SITE="/etc/nginx/sites-available/steam-bot"
-NGINX_LINK="/etc/nginx/sites-enabled/steam-bot"
-SYSTEMD_UNIT="/etc/systemd/system/steam-bot.service"
+APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+cd "$APP_DIR"
 
-SKIP_SYSTEM=0
+NO_BUILD=0
+SHOW_LOGS=0
 for arg in "$@"; do
   case "$arg" in
-    --skip-system) SKIP_SYSTEM=1 ;;
-    -h|--help)
-      sed -n '2,18p' "$0"; exit 0 ;;
+    --no-build) NO_BUILD=1 ;;
+    --logs)     SHOW_LOGS=1 ;;
+    -h|--help)  sed -n '2,17p' "$0"; exit 0 ;;
   esac
 done
 
 log() { printf "\033[1;36m[deploy]\033[0m %s\n" "$*"; }
 err() { printf "\033[1;31m[deploy] %s\033[0m\n" "$*" >&2; }
 
-need_root() {
-  if [[ $EUID -ne 0 ]]; then
-    err "Esta seccion requiere sudo. Re-ejecuta:  sudo ./deploy.sh"
-    exit 1
-  fi
-}
-
-# ---- 1) Codigo ----
-if [[ ! -d "$APP_DIR" ]]; then
-  err "No existe $APP_DIR. Clona el repo primero (ver AWS_README.md)."
-  exit 1
-fi
-cd "$APP_DIR"
-
-if [[ -d ".git" ]]; then
-  log "Actualizando codigo (git pull)…"
-  git pull --ff-only || log "git pull fallo (puede ser repo local) — continuando"
-fi
-
-# ---- 2) venv + dependencias ----
-log "Preparando entorno virtual en ${VENV_DIR}"
-if [[ ! -d "$VENV_DIR" ]]; then
-  "$PY_BIN" -m venv "$VENV_DIR"
-fi
-
-# shellcheck disable=SC1091
-source "${VENV_DIR}/bin/activate"
-pip install --upgrade pip wheel
-
-log "Instalando dependencias del proyecto…"
-pip install -r requirements.txt
-pip install -r agent/requirements-agent.txt
-pip install -r webapp/requirements-web.txt
-deactivate
-
-# Asegurar que el .env existe
-if [[ ! -f "${APP_DIR}/.env" ]]; then
-  err "Falta ${APP_DIR}/.env  -> crea uno (ver .env.example)."
+# ---------- Comprobaciones ----------
+if ! command -v docker >/dev/null 2>&1; then
+  err "Docker no esta instalado. Sigue AWS_README.md (paso 1)."
   exit 1
 fi
 
-# Dueno correcto
-chown -R "${APP_USER}:${APP_USER}" "$APP_DIR" 2>/dev/null || true
-
-# ---- 3) System (nginx + systemd) ----
-if [[ $SKIP_SYSTEM -eq 0 ]]; then
-  need_root
-  log "Copiando configuracion de Nginx → ${NGINX_SITE}"
-  cp "${APP_DIR}/deploy/nginx.conf" "$NGINX_SITE"
-  ln -sf "$NGINX_SITE" "$NGINX_LINK"
-  rm -f /etc/nginx/sites-enabled/default
-  log "Validando Nginx…"
-  nginx -t
-
-  log "Copiando unit systemd → ${SYSTEMD_UNIT}"
-  cp "${APP_DIR}/deploy/steam-bot.service" "$SYSTEMD_UNIT"
-  systemctl daemon-reload
-  systemctl enable steam-bot
-
-  log "Recargando Nginx y arrancando steam-bot…"
-  systemctl reload nginx
-  systemctl restart steam-bot
+# Selecciona "docker compose" v2 o "docker-compose" v1
+if docker compose version >/dev/null 2>&1; then
+  DC="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  DC="docker-compose"
 else
-  log "Solo reiniciando el servicio (--skip-system)"
-  if command -v systemctl >/dev/null 2>&1; then
-    sudo systemctl restart steam-bot || true
-  fi
-fi
-
-# ---- 4) Healthcheck ----
-log "Verificando healthcheck…"
-sleep 2
-if curl -fsS http://127.0.0.1/api/health >/dev/null; then
-  log "OK: el servicio responde en :80/api/health"
-else
-  err "El healthcheck fallo. Revisa:  journalctl -u steam-bot -n 80 --no-pager"
+  err "Falta docker compose / docker-compose. Instala el plugin: 'sudo apt install docker-compose-plugin'."
   exit 1
 fi
 
-log "Despliegue completo. Abre http://<IP-publica-EC2>/ en tu navegador."
+if [[ ! -f .env ]]; then
+  err "Falta .env. Copia .env.example y rellena GITHUB_TOKEN antes de continuar."
+  exit 1
+fi
+
+# ---------- Git pull (si aplica) ----------
+if [[ -d .git ]]; then
+  log "git pull --ff-only"
+  git pull --ff-only || log "no pude hacer pull (puede ser repo local) - continuo"
+fi
+
+# ---------- Build + up ----------
+if [[ $NO_BUILD -eq 0 ]]; then
+  log "Construyendo imagen…"
+  $DC build --pull
+fi
+
+log "Levantando servicios…"
+$DC up -d --remove-orphans
+
+# ---------- Esperar healthcheck ----------
+log "Esperando que el backend este saludable…"
+for i in {1..30}; do
+  if curl -fsS http://127.0.0.1/api/health >/dev/null 2>&1; then
+    log "OK: /api/health responde."
+    log "Abre http://<IP-publica-EC2>/ en tu navegador."
+    if [[ $SHOW_LOGS -eq 1 ]]; then
+      log "Mostrando logs (Ctrl+C para salir, los servicios siguen)…"
+      $DC logs -f
+    fi
+    exit 0
+  fi
+  sleep 2
+done
+
+err "El backend no respondio. Revisa los logs:  $DC logs --tail=120"
+exit 1

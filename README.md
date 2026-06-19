@@ -75,8 +75,11 @@ Nota de Seguridad: El archivo .env está incluido en el .gitignore, por lo que l
 ```
 Steam-Support-Bot/
 ├── README.md                 # Esta guía
-├── AWS_README.md             # Guía paso a paso para desplegar en EC2 Ubuntu
-├── deploy.sh                 # Script de despliegue/actualización idempotente para EC2
+├── AWS_README.md             # Guía paso a paso para desplegar en EC2 con Docker
+├── deploy.sh                 # Script de despliegue automático (docker compose)
+├── Dockerfile                # Imagen Python 3.11-slim, usuario non-root
+├── docker-compose.yml        # Orquesta backend + Nginx + volumen de datos
+├── .dockerignore             # Excluye secretos y artefactos locales de la imagen
 ├── requirements.txt          # Dependencias de los notebooks y del núcleo
 ├── .env.example              # Plantilla de variables de entorno
 │
@@ -97,15 +100,15 @@ Steam-Support-Bot/
 │
 ├── webapp/                   # Interfaz web (FastAPI + SSE) — ver sección 13
 │   ├── server.py             #   FastAPI: /api/health, /api/support, /api/support/stream
+│   ├── security.py           #   Defensas: rate limit, filtros, sanitización (sección 15)
 │   ├── requirements-web.txt  #   Dependencias específicas (fastapi, uvicorn, pydantic)
 │   └── static/               #   Frontend (HTML/CSS/JS sin build step)
 │       ├── index.html        #     UI estilo Steam Big Picture (topbar + sidebar + chat)
 │       ├── styles.css        #     Tema oscuro con acento cyan + responsive
 │       └── app.js            #     Chat conversacional + EventSource (SSE)
 │
-├── deploy/                   # Configuración para despliegue en EC2 Ubuntu
-│   ├── nginx.conf            #   Reverse proxy con headers SSE-friendly
-│   └── steam-bot.service     #   Unit systemd para uvicorn
+├── deploy/                   # Configuración para despliegue en EC2
+│   └── nginx-docker.conf     #   Reverse proxy + rate limit + headers + SSE-friendly
 │
 ├── tests/                    # Pruebas de decisión adaptativa del agente
 └── docs/                     # Informe técnico
@@ -311,16 +314,41 @@ funciona en localhost y en la IP pública de EC2 sin cambios.
 
 ---
 
-# ☁️ Despliegue en AWS EC2
+# ☁️ Despliegue en AWS EC2 (Docker)
 
 Para servir la interfaz y el agente en una instancia EC2 Ubuntu 22.04 con
-Nginx + systemd, la guía paso a paso está en **[`AWS_README.md`](./AWS_README.md)**.
+**Docker Compose**, la guía paso a paso está en **[`AWS_README.md`](./AWS_README.md)**.
 Incluye:
 
+- Instalación de Docker Engine + Compose plugin en EC2.
 - Configuración del Security Group (puerto 80).
 - Clonado del repo en `/opt/steam-support-bot` y creación del `.env`.
-- Despliegue automático con `sudo ./deploy.sh` (venv + dependencias + Nginx +
-  systemd + healthcheck).
-- Comandos manuales equivalentes (por si prefieres no usar el script).
+- Despliegue automático con `./deploy.sh` (build + up + healthcheck).
+- Comandos manuales equivalentes y operaciones del día a día.
 - HTTPS opcional con Certbot.
 - Troubleshooting habitual (502, SSE cortado, etc.).
+
+---
+
+# 🛡️ Seguridad del bot (módulo `webapp/security.py`)
+
+El bot está endurecido contra los ataques cubiertos en el material
+**3.3.1 Protocolos de Seguridad y Consideraciones Éticas** (Prompt Injection,
+DoS, exfiltración de secretos). Resumen de defensas:
+
+| Capa | Defensa | Donde |
+|---|---|---|
+| Validación | Tope 1500 chars, filtro de prompt injection (lista OWASP LLM01), filtro de token-drain | `webapp/security.py` |
+| Validación | Sanitización estricta de email y Steam ID | `webapp/security.py` |
+| Rate limit | 5 req/min, 30 req/día, cooldown 8 s por IP (memoria, sliding window) | `webapp/security.py` |
+| Rate limit | `limit_req` 10 req/s burst 20 + `limit_conn` 10 por IP en Nginx | `deploy/nginx-docker.conf` |
+| Presupuesto LLM | `max_tokens=1024`, `max_rpm=20`, `max_iter=8` por agente | `agent/config.py` + `agent/agents.py` |
+| Timeout | Crew cortado a los 60 s vía `asyncio.wait_for` | `webapp/server.py` |
+| Sanitización output | Censura tokens (`ghp_`, `lsv2_`, `sk-`, AWS keys, etc.) antes de enviar | `webapp/security.py` |
+| Mensajes de error | Genéricos al cliente, traza completa solo en logs internos | `webapp/server.py` |
+| HTTP headers | CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy | `webapp/server.py` + Nginx |
+| Docker hardening | Usuario non-root, `cap_drop: ALL`, `no-new-privileges`, límites de CPU/RAM | `Dockerfile` + `docker-compose.yml` |
+| Transparencia (XAI) | Trazas de cada llamada al LLM | LangSmith (`LANGSMITH_API_KEY` en `.env`) |
+
+Toda decisión defensiva está documentada en `webapp/security.py` con
+referencia a la categoría de OWASP Top 10 for LLM Applications.

@@ -1,0 +1,50 @@
+# Evita meter en la imagen secretos, datos generados y artefactos locales
+
+# Secretos
+.env
+.env.*
+!.env.example
+
+# Entornos virtuales y caches
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Datos generados por el agente (los reconstruye en runtime via volumen)
+agent/data/faiss_index/
+agent/data/email_outbox/
+agent/data/long_term_memory.jsonl
+
+# Notebooks y docs no se necesitan en la imagen
+notebooks/
+docs/
+tests/
+*.ipynb
+
+# Git, IDE
+.git/
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+
+# Build artifacts
+*.egg-info/
+build/
+dist/
+
+# Docker mismo
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Deploy nativo (ya no se usa, queda por compatibilidad)
+deploy/
+deploy.sh
+
+# READMEs y assets no usados en runtime
+README.md
+AWS_README.md
