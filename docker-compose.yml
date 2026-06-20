@@ -1,0 +1,77 @@
+# =====================================================================
+# Steam-Support-Bot - Despliegue con Docker Compose
+# Dos servicios:
+#   - app  : FastAPI + agente CrewAI (uvicorn en 8000, solo red interna)
+#   - nginx: Reverse proxy publico en :80 + SSE-friendly
+# Datos persistentes (FAISS, outbox simulado) en volumen.
+# =====================================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: steam-support-bot:latest
+    container_name: steam-bot-app
+    restart: unless-stopped
+    # No publicamos puertos hacia el host: solo Nginx puede llegar.
+    expose:
+      - "8000"
+    env_file:
+      - .env
+    environment:
+      - LOG_LEVEL=INFO
+      # En produccion CORS queda apagado: Nginx sirve todo desde el mismo origen
+      - ENABLE_CORS=0
+    volumes:
+      # Persiste el indice FAISS, log de casos y outbox simulado
+      - bot-data:/app/agent/data
+    networks:
+      - botnet
+    # Hardening basico
+    read_only: false                # FAISS necesita escribir el indice
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Limites de recursos (anti DoS al host)
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1500M
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: steam-bot-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx-docker.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./webapp/static:/usr/share/nginx/html:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - botnet
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+
+networks:
+  botnet:
+    driver: bridge
+
+volumes:
+  bot-data:

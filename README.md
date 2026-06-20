@@ -32,9 +32,11 @@ Sabrás que está activo porque aparecerá (.venv) al inicio de tu línea de com
 ---
 
 4. Instalacion de dependencias
-Instala todas las librerias necesarias utilizando el archivo llamado requirements.txt:
+Instala todas las librerias necesarias utilizando los tres archivos de requirements (nucleo + agente + interfaz web):
 
 pip install -r requirements.txt
+pip install -r agent/requirements-agent.txt
+pip install -r webapp/requirements-web.txt
 
 
 4.1  Instalacion de dependencias (Linux)
@@ -46,6 +48,8 @@ Actualizar pip (Opcional)
 Instalacion de dependencias
 
 * pip install -r requirements.txt
+* pip install -r agent/requirements-agent.txt
+* pip install -r webapp/requirements-web.txt
 
 (Si este da errores con langsmith se puede probar limpiando la cache del pip)
 
@@ -71,7 +75,12 @@ Nota de Seguridad: El archivo .env está incluido en el .gitignore, por lo que l
 ```
 Steam-Support-Bot/
 ├── README.md                 # Esta guía
-├── requirements.txt          # Dependencias de los notebooks
+├── AWS_README.md             # Guía paso a paso para desplegar en EC2 con Docker
+├── deploy.sh                 # Script de despliegue automático (docker compose)
+├── Dockerfile                # Imagen Python 3.11-slim, usuario non-root
+├── docker-compose.yml        # Orquesta backend + Nginx + volumen de datos
+├── .dockerignore             # Excluye secretos y artefactos locales de la imagen
+├── requirements.txt          # Dependencias de los notebooks y del núcleo
 ├── .env.example              # Plantilla de variables de entorno
 │
 ├── notebooks/                # Notebooks didácticos (paso a paso) + bot integrado
@@ -88,6 +97,19 @@ Steam-Support-Bot/
 │   └── reglas_steam.txt         # Base de conocimiento para el RAG (notebook 06)
 │
 ├── agent/                    # Agente autónomo de soporte (CrewAI) — ver sección siguiente
+│
+├── webapp/                   # Interfaz web (FastAPI + SSE) — ver sección 13
+│   ├── server.py             #   FastAPI: /api/health, /api/support, /api/support/stream
+│   ├── security.py           #   Defensas: rate limit, filtros, sanitización (sección 15)
+│   ├── requirements-web.txt  #   Dependencias específicas (fastapi, uvicorn, pydantic)
+│   └── static/               #   Frontend (HTML/CSS/JS sin build step)
+│       ├── index.html        #     UI estilo Steam Big Picture (topbar + sidebar + chat)
+│       ├── styles.css        #     Tema oscuro con acento cyan + responsive
+│       └── app.js            #     Chat conversacional + EventSource (SSE)
+│
+├── deploy/                   # Configuración para despliegue en EC2
+│   └── nginx-docker.conf     #   Reverse proxy + rate limit + headers + SSE-friendly
+│
 ├── tests/                    # Pruebas de decisión adaptativa del agente
 └── docs/                     # Informe técnico
 ```
@@ -255,3 +277,78 @@ pytest tests/test_agent_flows.py -v
 
 > La documentación ampliada del agente está en `agent/README.md` y el informe
 > técnico completo en `docs/Informe_Tecnico_EP2.md`.
+
+---
+
+# 🌐 Interfaz web (módulo `webapp/`)
+
+Además de la CLI, el proyecto incluye una **interfaz web** que envuelve
+`resolver_caso_soporte` con FastAPI y un frontend conversacional (estilo Steam
+Big Picture: topbar + sidebar de categorías + chat con burbujas). El backend
+expone tres endpoints:
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET`  | `/api/health` | Healthcheck para Nginx/monitoreo |
+| `POST` | `/api/support` | Ejecuta el crew y devuelve el resultado en JSON |
+| `GET`  | `/api/support/stream` | Server-Sent Events con el progreso en vivo |
+
+## 13. Levantar la web en local
+
+Con el entorno virtual activado y las dependencias instaladas (incluidas las
+de `webapp/requirements-web.txt`):
+
+```bash
+# desde la raíz del proyecto
+uvicorn webapp.server:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Abre **http://127.0.0.1:8000/** en el navegador.
+
+> ⚠️ No abras `webapp/static/index.html` con doble clic: las rutas a
+> `/static/styles.css` y `/api/*` no resuelven con `file://`. Siempre accede
+> por el servidor uvicorn.
+
+El frontend usa **rutas relativas** (`/api/...`), por lo que el mismo bundle
+funciona en localhost y en la IP pública de EC2 sin cambios.
+
+---
+
+# ☁️ Despliegue en AWS EC2 (Docker)
+
+Para servir la interfaz y el agente en una instancia EC2 Ubuntu 22.04 con
+**Docker Compose**, la guía paso a paso está en **[`AWS_README.md`](./AWS_README.md)**.
+Incluye:
+
+- Instalación de Docker Engine + Compose plugin en EC2.
+- Configuración del Security Group (puerto 80).
+- Clonado del repo en `/opt/steam-support-bot` y creación del `.env`.
+- Despliegue automático con `./deploy.sh` (build + up + healthcheck).
+- Comandos manuales equivalentes y operaciones del día a día.
+- HTTPS opcional con Certbot.
+- Troubleshooting habitual (502, SSE cortado, etc.).
+
+---
+
+# 🛡️ Seguridad del bot (módulo `webapp/security.py`)
+
+El bot está endurecido contra los ataques cubiertos en el material
+**3.3.1 Protocolos de Seguridad y Consideraciones Éticas** (Prompt Injection,
+DoS, exfiltración de secretos). Resumen de defensas:
+
+| Capa | Defensa | Donde |
+|---|---|---|
+| Validación | Tope 1500 chars, filtro de prompt injection (lista OWASP LLM01), filtro de token-drain | `webapp/security.py` |
+| Validación | Sanitización estricta de email y Steam ID | `webapp/security.py` |
+| Rate limit | 5 req/min, 30 req/día, cooldown 8 s por IP (memoria, sliding window) | `webapp/security.py` |
+| Rate limit | `limit_req` 10 req/s burst 20 + `limit_conn` 10 por IP en Nginx | `deploy/nginx-docker.conf` |
+| Presupuesto LLM | `max_tokens=1024`, `max_rpm=20`, `max_iter=8` por agente | `agent/config.py` + `agent/agents.py` |
+| Timeout | Crew cortado a los 60 s vía `asyncio.wait_for` | `webapp/server.py` |
+| Sanitización output | Censura tokens (`ghp_`, `lsv2_`, `sk-`, AWS keys, etc.) antes de enviar | `webapp/security.py` |
+| Mensajes de error | Genéricos al cliente, traza completa solo en logs internos | `webapp/server.py` |
+| HTTP headers | CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy | `webapp/server.py` + Nginx |
+| Docker hardening | Usuario non-root, `cap_drop: ALL`, `no-new-privileges`, límites de CPU/RAM | `Dockerfile` + `docker-compose.yml` |
+| Transparencia (XAI) | Trazas de cada llamada al LLM | LangSmith (`LANGSMITH_API_KEY` en `.env`) |
+
+Toda decisión defensiva está documentada en `webapp/security.py` con
+referencia a la categoría de OWASP Top 10 for LLM Applications.

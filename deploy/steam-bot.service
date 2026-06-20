@@ -1,0 +1,50 @@
+# /etc/systemd/system/steam-bot.service
+#
+# Servicio systemd para Steam-Support-Bot (FastAPI + Uvicorn).
+# Asume que el repo esta en /opt/steam-support-bot y el venv en
+# /opt/steam-support-bot/.venv. Lo arranca como el usuario "ubuntu".
+#
+# Activar:
+#   sudo cp deploy/steam-bot.service /etc/systemd/system/steam-bot.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now steam-bot
+#
+# Ver logs:
+#   journalctl -u steam-bot -f
+
+[Unit]
+Description=Steam Support Bot (FastAPI/Uvicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/steam-support-bot
+
+# Carga el .env automaticamente
+EnvironmentFile=/opt/steam-support-bot/.env
+
+# Variables utiles (puedes overridear)
+Environment=PYTHONUNBUFFERED=1
+Environment=LOG_LEVEL=INFO
+
+ExecStart=/opt/steam-support-bot/.venv/bin/uvicorn webapp.server:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 1 \
+    --proxy-headers \
+    --forwarded-allow-ips=127.0.0.1
+
+Restart=on-failure
+RestartSec=5s
+
+# Hardening basico
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

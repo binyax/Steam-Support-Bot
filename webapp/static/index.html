@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Steam Support</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- =================== TOPBAR =================== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">STEAM</span>
+      <span class="brand-sub">support</span>
+    </div>
+
+    <nav class="topnav">
+      <a class="topnav-item">Tienda</a>
+      <a class="topnav-item">Biblioteca</a>
+      <a class="topnav-item active">Soporte</a>
+      <a class="topnav-item">Comunidad</a>
+    </nav>
+
+    <button id="profile-toggle" class="profile-card" aria-haspopup="true" aria-expanded="false">
+      <span class="profile-avatar" aria-hidden="true">
+        <span class="profile-ring"></span>
+        <span class="profile-initials" id="profile-initials">U</span>
+      </span>
+      <span class="profile-meta">
+        <span class="profile-name" id="profile-name">Usuario</span>
+        <span class="profile-status"><span class="status-dot"></span> En línea</span>
+      </span>
+    </button>
+
+    <!-- Popover de edición de perfil -->
+    <div id="profile-popover" class="popover" hidden>
+      <h3>Tu cuenta de soporte</h3>
+      <p class="popover-hint">Se guarda en este navegador para no pedírtelo cada vez.</p>
+      <label for="pp-email">Email</label>
+      <input type="email" id="pp-email" placeholder="tu@correo.com" />
+      <label for="pp-steam">Steam ID <span class="hint">(opcional)</span></label>
+      <input type="text" id="pp-steam" placeholder="miUsuario" />
+      <div class="popover-actions">
+        <button id="pp-save" class="btn-accent">Guardar</button>
+        <button id="pp-cancel" class="btn-ghost">Cancelar</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- =================== APP =================== -->
+  <div class="app">
+
+    <!-- =================== SIDEBAR =================== -->
+    <aside class="sidebar" aria-label="Categorías de soporte">
+      <h2 class="sidebar-title">¿Qué necesitas?</h2>
+      <ul class="cat-list" id="cat-list">
+        <li>
+          <button class="cat-item" data-cat="seguridad">
+            <span class="cat-icon">🛡️</span>
+            <span class="cat-text">
+              <b>Seguridad de cuenta</b>
+              <small>Accesos sospechosos, cuenta robada</small>
+            </span>
+          </button>
+        </li>
+        <li>
+          <button class="cat-item" data-cat="compras">
+            <span class="cat-icon">💳</span>
+            <span class="cat-text">
+              <b>Compras y reembolsos</b>
+              <small>Cargos, devoluciones, pagos</small>
+            </span>
+          </button>
+        </li>
+        <li>
+          <button class="cat-item" data-cat="juegos">
+            <span class="cat-icon">🎮</span>
+            <span class="cat-text">
+              <b>Problemas con juegos</b>
+              <small>Instalación, errores, partidas</small>
+            </span>
+          </button>
+        </li>
+        <li>
+          <button class="cat-item" data-cat="acceso">
+            <span class="cat-icon">🔐</span>
+            <span class="cat-text">
+              <b>Recuperar acceso</b>
+              <small>Contraseña, autenticador, email</small>
+            </span>
+          </button>
+        </li>
+        <li>
+          <button class="cat-item" data-cat="otro">
+            <span class="cat-icon">📩</span>
+            <span class="cat-text">
+              <b>Otro problema</b>
+              <small>Cuéntanos qué pasa</small>
+            </span>
+          </button>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <span id="health-indicator" class="health offline" title="Estado del servicio">
+          <span class="dot"></span> conectando…
+        </span>
+      </div>
+    </aside>
+
+    <!-- =================== CHAT =================== -->
+    <main class="chat">
+      <div class="chat-header">
+        <h1>Asistencia de Steam</h1>
+        <p>Cuéntanos qué pasó. El agente clasificará, buscará el procedimiento y enviará un correo de seguimiento.</p>
+      </div>
+
+      <div id="messages" class="messages" aria-live="polite"></div>
+
+      <form id="chat-form" class="composer" autocomplete="off">
+        <textarea
+          id="composer-input"
+          placeholder="Escribe tu mensaje…  (Shift+Enter para nueva línea)"
+          rows="1"
+          maxlength="4000"
+          required
+        ></textarea>
+        <button type="submit" id="send-btn" class="btn-accent send" aria-label="Enviar">
+          <span class="send-label">Enviar</span>
+          <span class="send-arrow" aria-hidden="true">▶</span>
+        </button>
+      </form>
+      <p class="composer-foot">
+        Enter envía · Shift+Enter salto de línea · Las respuestas pueden tardar unos segundos.
+      </p>
+    </main>
+  </div>
+
+  <!-- =================== TEMPLATES =================== -->
+  <template id="tpl-bubble-bot">
+    <div class="bubble bot">
+      <span class="bubble-avatar" aria-hidden="true">🤖</span>
+      <div class="bubble-body"></div>
+    </div>
+  </template>
+
+  <template id="tpl-bubble-user">
+    <div class="bubble user">
+      <div class="bubble-body"></div>
+    </div>
+  </template>
+
+  <template id="tpl-steps">
+    <div class="steps-card">
+      <button class="steps-toggle" type="button">
+        <span class="steps-icon">⚡</span>
+        <span class="steps-title">El agente está trabajando…</span>
+        <span class="steps-caret">▾</span>
+      </button>
+      <div class="steps-body">
+        <ol class="steps-list"></ol>
+      </div>
+    </div>
+  </template>
+
+  <script src="/app.js"></script>
+</body>
+</html>
