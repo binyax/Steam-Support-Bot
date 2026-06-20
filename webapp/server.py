@@ -433,7 +433,16 @@ async def support_stream(
             q.put(("done", {"resultado": texto}))
         except Exception as e:
             log.exception("Fallo en SSE")
-            q.put(("error", {"detail": str(e)}))
+            error_str = str(e).lower()
+            if "content_filter" in error_str or "jailbreak" in error_str or "responsibleaipolicyviolation" in error_str:
+                mensaje_usuario = (
+                    "No puedo ayudarte con eso. Solo puedo asistirte con consultas "
+                    "de soporte de Steam (cuenta, compras, juegos o seguridad). "
+                    "¿En qué problema de Steam te puedo ayudar?"
+                )
+            else:
+                mensaje_usuario = "No pudimos procesar tu mensaje. Intentalo de nuevo o reformula tu consulta."
+            q.put(("error", {"detail": mensaje_usuario}))
         finally:
             q.put(SENTINEL)
 

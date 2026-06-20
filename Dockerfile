@@ -22,7 +22,7 @@ WORKDIR /build
 # Instalamos en un prefijo aislado y luego lo copiamos a la imagen final
 COPY requirements.txt agent/requirements-agent.txt webapp/requirements-web.txt ./
 RUN pip install --upgrade pip wheel && \
-    pip install --prefix=/install \
+    pip install --prefix=/install --ignore-installed \
         -r requirements.txt \
         -r requirements-agent.txt \
         -r requirements-web.txt
